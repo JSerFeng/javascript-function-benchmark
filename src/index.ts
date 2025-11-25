@@ -1,7 +1,7 @@
 import { Worker } from "node:worker_threads";
 import { Bench } from "tinybench";
 
-type MethodKind = "method" | "arrow";
+type MethodKind = "method" | "arrow" | "arrow-parentheses";
 
 type Stats = {
   samples: number;
@@ -88,6 +88,7 @@ type LoadWorkerFailure = {
 type LoadWorkerResponse = LoadWorkerSuccess | LoadWorkerFailure;
 
 async function main() {
+  console.log("Node version " + process.version)
   console.log("=== Object definition load benchmark ===");
   console.log(
     `Objects per generated module: ${objectCount}, samples per variant: ${loadIterations}`
@@ -96,6 +97,7 @@ async function main() {
   const loadResults = await Promise.all([
     measureLoad("method", objectCount, loadIterations),
     measureLoad("arrow", objectCount, loadIterations),
+    measureLoad("arrow-parentheses", objectCount, loadIterations),
   ]);
 
   for (const result of loadResults) {
@@ -144,7 +146,7 @@ async function measureLoad(
   const total = computeStats(totalDurations);
 
   return {
-    label: kind === "method" ? "method shorthand" : "arrow property",
+    label: kind === "method" ? "method shorthand" : kind === "arrow" ? "arrow" : "arrow with parentheses",
     compile,
     instantiate,
     total,
@@ -264,8 +266,11 @@ function buildModuleSource(
     const header = `  { value: ${index},`;
     if (kind === "method") {
       return `${header} foo() { return this.value; } }`;
+    } else if (kind === "arrow-parentheses") {
+      return `${header} foo: (() => ${index}) }`;
+    } else {
+      return `${header} foo: () => ${index} }`;
     }
-    return `${header} foo: () => ${index} }`;
   }).join(",\n");
 
   return `"use strict";\n// iteration ${iteration}\nconst objects = [\n${entries}\n];\nreturn objects;`;
